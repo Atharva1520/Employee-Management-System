@@ -1,0 +1,138 @@
+Flow -
+
+1️⃣ Postman / Client
+
+Class/Layer: N/A
+Function: N/A
+Role: Sends the HTTP request with the Basic Auth header.
+
+Example:
+
+GET /api/profile
+Authorization: Basic ZTEwMDE6bXlwYXNzd29yZDEyMw==
+
+2️⃣ DispatcherServlet
+
+Class: org.springframework.web.servlet.DispatcherServlet
+Function: doDispatch(HttpServletRequest request, HttpServletResponse response)
+Role: Entry point of Spring MVC. Routes the request through the filter chain (including Spring Security) before reaching your controller.
+
+3️⃣ Spring Security Filter Chain
+
+Class: org.springframework.security.web.FilterChainProxy
+Function: doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+Role: Applies all security filters sequentially. For Basic Auth:
+
+Filter: BasicAuthenticationFilter
+Function: doFilterInternal(...)
+
+Reads the Authorization header.
+
+Decodes Base64 → empId:password.
+
+Calls AuthenticationManager.authenticate().
+
+4️⃣ AuthenticationManager / UserDetailsService
+
+Class: org.springframework.security.authentication.ProviderManager
+Function: authenticate(Authentication authentication)
+
+Delegates authentication to your custom UserDetailsService.
+
+Class: com.example.employee.management.security.CEmployeeProfileSecurity
+Function: loadUserByUsername(String empId)
+
+Loads user by empId from IEmployeeRepository.
+
+Returns a UserDetails object:
+
+Username → empId
+
+Password → hashed password from DB
+
+Roles/Authorities → e.g., EMP or MGR
+
+5️⃣ Password Verification
+
+Class: org.springframework.security.authentication.dao.DaoAuthenticationProvider
+Function: additionalAuthenticationChecks(UserDetails userDetails, UsernamePasswordAuthenticationToken authentication)
+
+Compares submitted password (from Basic Auth) with stored password using BCryptPasswordEncoder.
+
+On success → creates Authentication object.
+
+On failure → throws BadCredentialsException (401 Unauthorized).
+
+6️⃣ SecurityContext
+
+Class: org.springframework.security.core.context.SecurityContextHolder
+Function: setAuthentication(Authentication authentication)
+Role: Stores the authenticated user in thread-local storage. Now the request is authenticated.
+
+7️⃣ Controller Layer
+
+Class: com.example.employee.management.controller.CEmployeeProfileController
+Function: viewProfile(Authentication authentication)
+
+String empId = authentication.getName(); // gets logged-in empId
+Optional<CEmployeeProfile> profile = profileService.viewProfile(empId);
+
+
+Spring injects Authentication automatically.
+
+Controller calls Service layer to fetch profile.
+
+8️⃣ Service Layer
+
+Class: com.example.employee.management.service.CEmployeeProfileService
+Function: viewProfile(String empId)
+
+Calls repository:
+
+return profileRespository.findByStrEmpId(empId);
+
+
+Returns Optional<CEmployeeProfile> to controller.
+
+9️⃣ Repository Layer
+
+Class: com.example.employee.management.Repository.IEmployeeRepository
+Function: Optional<CEmployeeProfile> findByStrEmpId(String empId)
+
+Uses Spring Data JPA to generate the query:
+
+SELECT * FROM employee_profile WHERE emp_id = :empId
+
+
+Returns the record wrapped in Optional.
+
+🔟 Response Back to Postman
+
+Class: com.example.employee.management.controller.CEmployeeProfileController
+Function: viewProfile(Authentication authentication)
+
+Wraps the profile in ApiResponse:
+
+{
+  "status": 200,
+  "success": true,
+  "message": "Profile fetched",
+  "data": { ...profile fields... }
+}
+
+
+Spring MVC serializes to JSON and returns to Postman.
+
+✅ Summary Table with Class & Function Names
+Layer	Class	Function	Role
+Client	N/A	N/A	Sends HTTP request with Basic Auth
+Dispatcher	DispatcherServlet	doDispatch	Routes request through filter chain
+Security Filter	BasicAuthenticationFilter	doFilterInternal	Reads header, decodes, calls AuthenticationManager
+Auth Manager	ProviderManager	authenticate	Delegates authentication
+User Loader	CEmployeeProfileSecurity	loadUserByUsername	Loads user from DB
+Password Check	DaoAuthenticationProvider	additionalAuthenticationChecks	Verifies password
+Security Context	SecurityContextHolder	setAuthentication	Stores logged-in user
+Controller	CEmployeeProfileController	viewProfile	Calls service, wraps response
+Service	CEmployeeProfileService	viewProfile	Fetches profile via repository
+Repository	IEmployeeRepository	findByStrEmpId	Queries DB
+Response	Controller	viewProfile	Returns JSON to client
