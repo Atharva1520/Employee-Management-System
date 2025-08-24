@@ -9,7 +9,7 @@ Role: Sends the HTTP request with the Basic Auth header.
 Example:
 
 GET /api/profile
-Authorization: Basic ZTEwMDE6bXlwYXNzd29yZDEyMw==
+
 
 2️⃣ DispatcherServlet
 
